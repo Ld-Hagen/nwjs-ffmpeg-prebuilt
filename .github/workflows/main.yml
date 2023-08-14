@@ -2,21 +2,38 @@ name: CI
 
 on:
   release:
-    types: [created]
+    types: [ created ]
+  schedule:
+    - cron: '0 0 * * *'
+
+concurrency:
+  group: ${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
+  is-latest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      - working-directory: .github/workflows
+        run: bash ./is_latest.sh
+
   build-win:
-    runs-on: windows-2019
+    needs: [ is-latest ]
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: powershell
     steps:
       - name: Setup Node
         uses: actions/setup-node@v3
         with:
           node-version: 16
-      - uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v3
       - name: Copy to C drive
         run: cp D:\a C:\ -Recurse
-#      - name: Setup tmate session
-#        uses: mxschmitt/action-tmate@v3
       - name: npm install, build and test
         working-directory: "C:/a/${{ github.event.repository.name }}/${{ github.event.repository.name }}"
         run: |
@@ -31,17 +48,20 @@ jobs:
           path: 'c:/a/**/build/out/*.zip'
 
   build-macos:
+    needs: [ is-latest ]
     runs-on: macos-latest
     steps:
       - name: Setup Node
         uses: actions/setup-node@v3
         with:
           node-version: 16
-      - uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v3
       - name: npm install, build and test
         run: |
           npm install
-          node build
+          node build -a x64
+          node build -a arm64
       - name: Upload the artifacts
         uses: actions/upload-artifact@v3
         with:
@@ -49,17 +69,34 @@ jobs:
           path: 'build/out/*.zip'
 
   build-linux:
+    needs: [ is-latest ]
     runs-on: ubuntu-latest
     steps:
       - name: Setup Node
         uses: actions/setup-node@v3
         with:
           node-version: 16
-      - uses: actions/checkout@v3
-      - name: disk space cleanup
-        run: |
-          sudo rm -rf /usr/local/lib/android # will release about 10 GB if you don't need Android
-          sudo rm -rf /usr/share/dotnet # will release about 20GB if you don't need .NET
+      - name: Checkout code
+        uses: actions/checkout@v3
+      - name: Free Disk Space (Ubuntu)
+        uses: jlumbroso/free-disk-space@main
+        with:
+          # this might remove tools that are actually needed,
+          # if set to "true" but frees about 6 GB
+          tool-cache: false
+
+          # all of these default to true, but feel free to set to
+          # "false" if necessary for your workflow
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: true
+          docker-images: true
+          swap-storage: true
+      #      - name: disk space cleanup
+      #        run: |
+      #          sudo rm -rf /usr/local/lib/android # will release about 10 GB if you don't need Android
+      #          sudo rm -rf /usr/share/dotnet # will release about 20GB if you don't need .NET
       - name: npm install, build and test
         run: |
           npm install
@@ -72,10 +109,13 @@ jobs:
           path: 'build/out/*.zip'
 
   build-release:
-    needs: [build-win, build-macos, build-linux]
+    needs: [ build-win, build-macos, build-linux ]
     name: "Build Release"
     runs-on: "ubuntu-latest"
     steps:
+      - name: Get NWJS version
+        run: |
+          echo "NW=$(curl -s https://nwjs.io/versions | jq -r '.latest' | sed 's/v//')" >> $GITHUB_ENV
       - uses: actions/download-artifact@v3
         with:
           name: win
@@ -98,7 +138,7 @@ jobs:
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: release/mac/*.zip
-          tag: ${{ github.ref }}
+          tag: ${{ env.NW }}
           overwrite: true
           file_glob: true
 
@@ -107,7 +147,7 @@ jobs:
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: release/linux/*.zip
-          tag: ${{ github.ref }}
+          tag: ${{ env.NW }}
           overwrite: true
           file_glob: true
 
@@ -116,6 +156,6 @@ jobs:
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: release/win/nwjs-ffmpeg-prebuilt/nwjs-ffmpeg-prebuilt/build/out/*.zip
-          tag: ${{ github.ref }}
+          tag: ${{ env.NW }}
           overwrite: true
           file_glob: true
