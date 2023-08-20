@@ -6,7 +6,7 @@ FF=v$(curl -s https://api.github.com/repos/Ld-Hagen/nwjs-ffmpeg-prebuilt/release
 
 # Remove v from both strings
 NW=${NW:1}
-FF=${FF:1}
+FF=${FF:12}
 
 
 # Split string at . into arrays
