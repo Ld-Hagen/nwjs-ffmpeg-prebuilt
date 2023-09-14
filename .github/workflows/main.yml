@@ -1,9 +1,14 @@
 name: CI
 
 on:
-  release:
-    types: [ created ]
+#  release:
+#    types: [ created ]
   workflow_dispatch:
+    inputs:
+      arch:
+        description: 'Build architecture'
+        required: true
+        default: 'x64'
 #  schedule:
 #    - cron: '0 0 * * *'
 
@@ -51,7 +56,7 @@ jobs:
       - name: npm install, build and test
         run: |
           npm install
-          node build --arch x64
+          node build --arch ${{ github.event.inputs.arch }}
 #          node build --arch ia32
       - name: Upload the artifacts
         uses: actions/upload-artifact@v3
