@@ -1,4 +1,5 @@
-name: CI
+name: Build release
+run-name: Build ${{ github.event.inputs.arch }} release
 
 on:
 #  release:
