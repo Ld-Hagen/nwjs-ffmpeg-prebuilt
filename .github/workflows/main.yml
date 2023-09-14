@@ -73,6 +73,7 @@ jobs:
       - name: Get NWJS version
         run: |
           echo "NW=$(curl -s https://nwjs.io/versions | jq -r '.latest' | sed 's/v//')" >> $GITHUB_ENV
+          echo "CHROMIUM=$(curl -s https://nwjs.io/versions | jq -r '.versions[0].components.chromium')" >> $GITHUB_ENV
       - uses: actions/download-artifact@v3
         with:
           name: linux
@@ -87,6 +88,7 @@ jobs:
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: release/linux/*.zip
-          tag: ${{ env.NW }}
+          tag: nwjs-ffmpeg-${{ env.NW }}
+          body: Chromium ${{ env.CHROMIUM }}
           overwrite: true
           file_glob: true
