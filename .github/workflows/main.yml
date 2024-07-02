@@ -1,16 +1,12 @@
 name: CI
 
 on:
-  release:
-    types: [ created ]
-  schedule:
-    - cron: '0 0 * * *'
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version number to build'
+        description: 'Build architecture'
         required: true
-        default: '0.89.0'
+        default: 'x64'
 concurrency:
   group: ${{ github.ref }}
   cancel-in-progress: true
@@ -28,59 +24,6 @@ jobs:
         env:
           GITHUB_EVENT_NAME: ${{ github.event_name }}
 
-
-  build-win:
-    needs: [ is-latest ]
-    name: "Build for Windows"
-    runs-on: windows-latest
-    defaults:
-      run:
-        shell: powershell
-    steps:
-      - name: Setup Node
-        uses: actions/setup-node@v4.0.2
-        with:
-          node-version: 16
-      - name: Checkout code
-        uses: actions/checkout@v4.1.7
-      - name: Copy to C drive
-        run: cp D:\a C:\ -Recurse
-      - name: Support long paths
-        run: git config --system core.longpaths true
-      - name: npm install, build and test
-        working-directory: "C:/a/${{ github.event.repository.name }}/${{ github.event.repository.name }}"
-        run: |
-          pwd
-          npm install
-          node build --arch x64
-          node build --arch ia32
-      - name: Upload the artifacts
-        uses: actions/upload-artifact@v4.3.3
-        with:
-          name: win
-          path: 'c:/a/**/build/out/*.zip'
-
-  build-macos:
-    needs: [ is-latest ]
-    name: "Build for MacOS"
-    runs-on: macos-latest
-    steps:
-      - name: Setup Node
-        uses: actions/setup-node@v4.0.2
-        with:
-          node-version: 16
-      - name: Checkout code
-        uses: actions/checkout@v4.1.7
-      - name: npm install, build and test
-        run: |
-          npm install
-          node build -a x64
-          node build -a arm64
-      - name: Upload the artifacts
-        uses: actions/upload-artifact@v4.3.3
-        with:
-          name: mac
-          path: 'build/out/*.zip'
 
   build-linux:
     needs: [ is-latest ]
@@ -111,8 +54,7 @@ jobs:
       - name: npm install, build and test
         run: |
           npm install
-          node build --arch x64
-          node build --arch ia32
+          node build --arch x64 ${{ github.event.inputs.arch }}
       - name: Upload the artifacts
         uses: actions/upload-artifact@v4.3.3
         with:
@@ -120,58 +62,30 @@ jobs:
           path: 'build/out/*.zip'
 
   build-release:
-    needs: [ build-win, build-macos, build-linux ]
+    needs: [ build-linux ]
     name: "Build Release"
     runs-on: "ubuntu-latest"
     steps:
       - name: Get NWJS version
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "NW=${{ github.event.inputs.version }}" >> $GITHUB_ENV
-          else
-            echo "NW=$(curl -s https://nwjs.io/versions | jq -r '.latest' | sed 's/v//')" >> $GITHUB_ENV
-          fi
+          echo "NW=$(curl -s https://nwjs.io/versions | jq -r '.latest' | sed 's/v//')" >> $GITHUB_ENV
+          echo "CHROMIUM=$(curl -s https://nwjs.io/versions | jq -r '.versions[0].components.chromium')" >> $GITHUB_ENV
 
-      - uses: actions/download-artifact@v4.1.7
-        with:
-          name: win
-          path: release/win
       - uses: actions/download-artifact@v4.1.7
         with:
           name: linux
           path: release/linux
-      - uses: actions/download-artifact@v4.1.7
-        with:
-          name: mac
-          path: release/mac
 
       - name: Display structure of downloaded files
         run: ls -R
         working-directory: release/
-
-      - name: Upload mac binaries to release
-        uses: svenstaro/upload-release-action@v2.9.0
-        with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: release/mac/*.zip
-          tag: ${{ env.NW }}
-          overwrite: true
-          file_glob: true
 
       - name: Upload linux binaries to release
         uses: svenstaro/upload-release-action@v2.9.0
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: release/linux/*.zip
-          tag: ${{ env.NW }}
-          overwrite: true
-          file_glob: true
-
-      - name: Upload windows binaries to release
-        uses: svenstaro/upload-release-action@v2.9.0
-        with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: release/win/nwjs-ffmpeg-prebuilt/nwjs-ffmpeg-prebuilt/build/out/*.zip
-          tag: ${{ env.NW }}
+          tag: nwjs-ffmpeg-${{ env.NW }}
+          body: Chromium ${{ env.CHROMIUM }}
           overwrite: true
           file_glob: true
