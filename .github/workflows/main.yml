@@ -68,8 +68,8 @@ jobs:
     steps:
       - name: Get NWJS version
         run: |
-          echo "NW=$(curl -s https://nwjs.io/versions | jq -r '.latest' | sed 's/v//')" >> $GITHUB_ENV
-          echo "CHROMIUM=$(curl -s https://nwjs.io/versions | jq -r '.versions[0].components.chromium')" >> $GITHUB_ENV
+          echo "NW=$(curl -s https://nwjs.io/versions.json | jq -r '.latest' | sed 's/v//')" >> $GITHUB_ENV
+          echo "CHROMIUM=$(curl -s https://nwjs.io/versions.json | jq -r '.versions[0].components.chromium')" >> $GITHUB_ENV
 
       - uses: actions/download-artifact@v4.1.8
         with:
